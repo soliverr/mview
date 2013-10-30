@@ -1,0 +1,60 @@
+--
+-- Delete MVIEW_BASE
+--
+
+prompt
+prompt I: Start deinstallation
+prompt
+
+--
+-- Load ORADBA schema variables
+@@confdir@/schema-define
+--
+-- Load package variables
+@@confdir@/@PACKAGE_NAME@-base-define
+
+--
+-- Set owner schema
+alter session set current_schema = &&MVIEW_BASE_SCHEMA_OWNER;
+prompt
+prompt I: Current schema is &&MVIEW_BASE_SCHEMA_OWNER
+prompt
+
+--
+-- Drop pulic synonyms
+prompt
+prompt I: Drop public synonyms ...
+prompt
+@@datarootdir@/@SECTION@/sqlinstaller/drop_synonym MVIEWS PUBLIC
+@@datarootdir@/@SECTION@/sqlinstaller/drop_synonym MVIEWS_EXCLUDE_IDX PUBLIC
+@@datarootdir@/@SECTION@/sqlinstaller/drop_synonym REFRESH_GROUPS PUBLIC
+@@datarootdir@/@SECTION@/sqlinstaller/drop_synonym MVIEW_BASE PUBLIC
+
+--
+-- Drop packages
+prompt
+prompt I: Drop packages ...
+prompt
+@@datarootdir@/@SECTION@/sqlinstaller/drop_package MVIEW_BASE
+
+--
+-- Drop tables and indexes
+prompt
+prompt I: Drop tables ...
+prompt
+@@datarootdir@/@SECTION@/sqlinstaller/drop_table REFRESH_GROUPS
+@@datarootdir@/@SECTION@/sqlinstaller/drop_table MVIEWS_EXCLUDE_IDX
+@@datarootdir@/@SECTION@/sqlinstaller/drop_table MVIEWS
+
+--
+-- Drop role
+prompt
+prompt I: Drop role ...
+prompt
+@@datarootdir@/@SECTION@/sqlinstaller/drop_role &&MVIEW_BASE_ROLE_NAME
+
+alter session set current_schema = &&l_cur_schema;
+
+prompt
+prompt I: Finish deinstallation
+prompt

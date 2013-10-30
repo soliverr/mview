@@ -1,0 +1,50 @@
+--
+-- Delete MVIEW
+--
+
+prompt
+prompt I: Start deinstallation
+prompt
+
+--
+-- Load ORADBA schema variables
+@@confdir@/schema-define
+--
+-- Load package variables
+@@confdir@/@PACKAGE_NAME@-base-define
+@@confdir@/@PACKAGE_NAME@-define
+
+--
+-- Set owner schema
+alter session set current_schema = &&ORA_SCHEMA_OWNER;
+prompt
+prompt I: Current schema is &&ORA_SCHEMA_OWNER
+prompt
+
+--
+-- Drop pulic synonyms
+prompt
+prompt I: Drop public synonyms ...
+prompt
+@@datarootdir@/@SECTION@/sqlinstaller/drop_synonym MVIEW PUBLIC
+@@datarootdir@/@SECTION@/sqlinstaller/drop_synonym MVIEW_REFRESH PUBLIC
+
+--
+-- Drop packages
+prompt
+prompt I: Drop packages ...
+prompt
+@@datarootdirx@/@SECTION@/sqlinstaller/drop_package MVIEW
+
+--
+-- Drop procedures
+prompt
+prompt I: Drop procedures ...
+prompt
+@@datarootdirx@/@SECTION@/sqlinstaller/drop_procedure MVIEW_REFRESH
+
+alter session set current_schema = &&l_cur_schema;
+
+prompt
+prompt I: Finish deinstallation
+prompt

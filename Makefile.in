@@ -1,0 +1,159 @@
+#
+#
+
+SHELL           = /bin/bash
+INSTALL         = install
+WRAP            = $(ORACLE_HOME)/bin/wrap
+top_srcdir      = @top_srcdir@
+srcdir          = @srcdir@
+sqlsrcdir       = $(srcdir)/sql
+VPATH           = @srcdir@
+
+# Package identification ---------------------------------------------------------------
+SECTION         = @SECTION@
+PACKAGE_NAME    = @PACKAGE_NAME@
+PACKAGE_TARNAME = @PACKAGE_TARNAME@
+PACKAGE_VERSION = @PACKAGE_VERSION@
+PACKAGE_STRING  = @PACKAGE_STRING@
+
+# Base directories ---------------------------------------------------------------------
+prefix          = @prefix@
+exec_prefix     = @exec_prefix@
+sbindir         = @sbindir@
+bindir          = @bindir@
+liblsb          = @liblsb@
+libdir          = @libdir@
+libexecdir      = @libexecdir@
+sysconfdir      = @sysconfdir@
+confdir         = @confdir@
+localstatedir   = @localstatedir@
+datarootdir     = @datarootdir@
+datadir         = @datadir@
+logdir          = @logdir@
+docdir          = @docdir@
+spooldir        = @spooldir@
+
+# Destination dir
+DESTDIR         =
+
+.PHONY: expand
+.PHONY: install install-dirs install-base-dirs install-docs install-files install-logrotate install-config
+.PHONY: install-crontabs install-crontabs-hourly install-crontabs-daily install-crontabs-weekly install-crontabs-monthly
+.PHONY: install-sql install-sh
+.PHONY: clean distclean mostlyclean
+
+install: expand install-dirs install-docs install-files
+
+expand: install-mview-base.sql install-mview.sql uninstall-mview-base.sql uninstall-mview.sql _pkg-functions
+	chmod +x $(srcdir)/build_expand.sh
+	$(srcdir)/build_expand.sh install-mview.sql uninstall-mview.sql
+	$(srcdir)/build_expand.sh install-mview-base.sql uninstall-mview-base.sql
+	$(srcdir)/build_expand.sh _pkg-functions
+
+install-base-dirs:
+	# Create base directories
+	$(INSTALL) --directory --mode 755 $(DESTDIR)$(confdir)
+	$(INSTALL) --directory --mode 755 $(DESTDIR)$(datadir)
+	$(INSTALL) --directory --mode 755 $(DESTDIR)$(datadir)/packages
+	$(INSTALL) --directory --mode 755 $(DESTDIR)$(datadir)/tables
+
+install-dirs: install-base-dirs
+	# Create package directories
+
+install-docs:
+	# Create documentation directories
+	$(INSTALL) --directory --mode 755 $(DESTDIR)$(docdir)
+	# Install doc files
+	if [ -r README ] ; then $(INSTALL) --mode 0644 README $(DESTDIR)$(docdir) ; fi
+
+install-files: install-config install-sql install-sh install-logrotate install-crontabs
+	# Install files
+
+install-config:
+	# Install config files
+	if [ -r config.vars ] ; then \
+	    $(INSTALL) --mode 664 config.vars $(DESTDIR)$(confdir)/$(PACKAGE_NAME).conf ; \
+	fi
+	$(INSTALL) --mode 664 define-mview-base.sql $(DESTDIR)$(confdir)/$(PACKAGE_NAME)-base-define.sql
+	$(INSTALL) --mode 664 define-mview.sql $(DESTDIR)$(confdir)/$(PACKAGE_NAME)-define.sql
+
+install-sql:
+	# Install sql-files
+	$(INSTALL) --mode 644 install-*.sql $(DESTDIR)$(datadir)
+	$(INSTALL) --mode 644 uninstall-*.sql $(DESTDIR)$(datadir)
+	for f in `ls $(sqlsrcdir)/*.sql 2>/dev/null | grep -v 'define-*\.sql' ` ; do \
+	  [ -z "$$f" ] && continue; \
+	  $(INSTALL) --mode 644 $$f $(DESTDIR)$(datadir) ; \
+	done
+	for f in `ls $(sqlsrcdir)/packages/*.sql 2>/dev/null` ; do \
+	  [ -z "$$f" ] && continue; \
+	  $(INSTALL) --mode 644 $$f $(DESTDIR)$(datadir)/packages ; \
+	done
+	for f in `ls $(sqlsrcdir)/tables/*.sql 2>/dev/null` ; do \
+	  [ -z "$$f" ] && continue; \
+	  $(INSTALL) --mode 644 $$f $(DESTDIR)$(datadir)/tables ; \
+	done
+
+install-sh:
+	# Install scripts
+	for f in `ls -1 *.sh | grep -v 'build.*.sh' 2>/dev/null` ; do \
+	  [ -z "$$f" ] && continue; \
+	  $(INSTALL) --mode 755 $$f $(DESTDIR)$(libexecdir) ; \
+	done
+
+install-logrotate:
+	# Install logrotate configuration
+	if [ -f logrotate.conf ] ; then \
+	    $(INSTALL) -D --mode 644 logrotate.conf $(DESTDIR)$(sysconfdir)/logrotate.d/$(PACKAGE_NAME).conf; \
+	fi
+
+install-crontabs: install-crontabs-hourly install-crontabs-daily install-crontabs-weekly install-crontabs-monthly
+	# Install cron files
+	-if [ -f crontab.d ] ; then \
+	    $(INSTALL) -D --mode 644 crontab.d $(DESTDIR)$(confdir)/cron.d/$(PACKAGE_NAME) ; \
+	fi
+
+install-crontabs-hourly:
+	if [ -f crontab.hourly ] ; then \
+	    $(INSTALL) -D --mode 755 crontab.hourly $(DESTDIR)$(confdir)/cron.hourly/$(PACKAGE_NAME) ; \
+	fi
+
+install-crontabs-daily:
+	if [ -f crontab.daily ] ; then \
+	    $(INSTALL) -D --mode 755 crontab.daily $(DESTDIR)$(confdir)/cron.daily/$(PACKAGE_NAME) ; \
+	fi
+
+install-crontabs-weekly:
+	if [ -f crontab.weekly ] ; then \
+	    $(INSTALL) -D --mode 755 crontab.weekly $(DESTDIR)$(confdir)/cron.weekly/$(PACKAGE_NAME) ; \
+	fi
+
+install-crontabs-monthly:
+	if [ -f crontab.monthly ] ; then \
+	    $(INSTALL) -D --mode 755 crontab.monthly $(DESTDIR)$(confdir)/cron.monthly/$(PACKAGE_NAME) ; \
+	fi
+
+clean:
+	rm -fv install-*.sql uninstall-*.sql _pkg-functions
+	rm -fv Makefile config.h config.status config.cache config.log build_expand.sh
+
+distclean: clean
+	rm -rf autom4te.cache
+	find . -type f -iwholename '*~' -exec rm -fv {} ';'
+	if [ -d test ]; then rm -rf test; fi
+	if [ -d inst ]; then rm -rf inst; fi
+
+mostlyclean: clean
+
+maintainer-clean: clean
+	fakeroot debian/rules clean || true
+
+# automatic re-running of configure if the configure.ac file has changed
+${srcdir}/configure: configure.ac
+	cd ${srcdir} && autoconf
+
+Makefile: Makefile.in config.status
+	./config.status
+
+config.status: configure
+	./config.status --recheck

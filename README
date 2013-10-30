@@ -1,0 +1,9 @@
+oradba-mview
+------------
+
+Package to support replication with materialized views.
+
+Project is hosted on SourceForge: http://sourceforge.net/projects/oracledba
+
+ -- Kryazhevskikh Sergey <soliverr@gmail.com>
+

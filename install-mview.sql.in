@@ -1,0 +1,139 @@
+--
+-- Install MVIEW
+--
+
+prompt
+prompt I: Start installation
+prompt
+
+--
+-- Load ORADBA schema variables
+@@confdir@/schema-define
+--
+-- Load package variables
+@@confdir@/@PACKAGE_NAME@-base-define
+@@confdir@/@PACKAGE_NAME@-define
+
+set echo off
+spool @spooldir@/@PACKAGE_NAME@.sql
+
+declare
+  cur$action  integer := sqlinstaller.ACTION_MODIFY;
+  cur$owner   sys.all_users.username%type := '&&ORA_SCHEMA_OWNER' ;
+  cur$cfg     sqlinstaller_config_type;
+  cur$sqltext varchar2(1024);
+begin
+  -- By default all actions are enabled
+  cur$cfg := sqlinstaller_config_type( NULL, NULL,
+                                       sqlinstaller.action_any, sqlinstaller.enabled );
+
+  dbms_output.put_line( CHR(10) || '-- START ACTION --' );
+  dbms_output.put_line( 'set verify off' );
+  dbms_output.put_line( '--' );
+  dbms_output.put_line( 'define ORA_SCHEMA_OWNER = ' || cur$owner );
+  dbms_output.put_line( '-- Set owner schema' );
+  dbms_output.put_line( 'alter session set current_schema = ' || cur$owner || ';' );
+  dbms_output.put_line( 'prompt' );
+  dbms_output.put_line( 'prompt I: Current schema is ' || cur$owner );
+  dbms_output.put_line( 'prompt' );
+
+  -- Create packages
+  dbms_output.put_line( 'prompt' );
+  dbms_output.put_line( 'prompt I: Creating packages ...' );
+  dbms_output.put_line( 'prompt' );
+
+  cur$cfg.object_name := cur$owner||'.mview';
+  cur$cfg.object_type := sqlinstaller.p_package;
+  sqlinstaller.cfg_set( cur$cfg );
+  cur$cfg.object_type := sqlinstaller.p_package_body;
+  sqlinstaller.cfg_set( cur$cfg );
+  sqlinstaller.do_package( cur$action, cur$owner||'.mview', '@datadir@/packages/mview_def' );
+  sqlinstaller.do_package_body( cur$action, cur$owner||'.mview', '@datadir@/packages/mview_body' );
+
+  --
+  -- Create public refresh procedure
+  dbms_output.put_line( 'prompt' );
+  dbms_output.put_line( 'prompt I: Creating procedures ...' );
+  dbms_output.put_line( 'prompt' );
+  cur$cfg.object_name := cur$owner||'.mview_refresh';
+  cur$cfg.object_type := sqlinstaller.p_procedure;
+  sqlinstaller.cfg_set( cur$cfg );
+  sqlinstaller.do_procedure( cur$action, cur$owner||'.mview_refresh', '@datadir@/create_proc' );
+
+  --
+  -- Grant execution to role
+  dbms_output.put_line( 'grant execute on ' || cur$owner || '.mview to &&MVIEW_BASE_ROLE_NAME;' );
+  dbms_output.put_line( 'grant execute on ' || cur$owner || '.mview_refresh to &&MVIEW_BASE_ROLE_NAME;' );
+
+  dbms_output.put_line( 'alter session set current_schema = &&l_cur_schema;' );
+
+  --
+  -- Granting privileges
+  dbms_output.put_line( 'prompt' );
+  dbms_output.put_line( 'prompt I: Granting rights ...' );
+  dbms_output.put_line( 'prompt' );
+  dbms_output.put_line( 'exec &&MVIEW_BASE_SCHEMA_OWNER..mview_base.grant_refresh_admin(''' || cur$owner || ''');' );
+
+  dbms_output.put_line( CHR(10) || '-- END ACTION --' );
+end;
+/
+spool off
+
+alter session set current_schema = &&l_cur_schema;
+
+-- Execute generated install script
+host sed --in-place '1, /^-- START ACTION --/d; /^-- END ACTION --/,$d' @spooldir@/@PACKAGE_NAME@.sql
+@@spooldir@/@PACKAGE_NAME@.sql
+
+-- Remove spool file
+host rm -f @spooldir@/@PACKAGE_NAME@.sql
+
+--
+-- Create public synonyms
+prompt
+prompt I: Creating public synonyms ...
+prompt
+
+begin
+  if sqlinstaller.chk_synonym( 'public.mview' ) = false then
+   execute immediate
+     'create or replace public synonym MVIEW for &&ORA_SCHEMA_OWNER..mview';
+   dbms_output.put_line( 'I: Public synonym MVIEW created' );
+  end if;
+
+  if sqlinstaller.chk_synonym( 'public.mview_refresh' ) = false then
+    execute immediate
+     'create or replace public synonym MVIEW_REFRESH for &&ORA_SCHEMA_OWNER..mview_refresh' ;
+    dbms_output.put_line( 'I: Public synonym MVIEW_REFRESH created' );
+  end if;
+end;
+/
+
+--
+-- Set debug level
+/*
+declare
+  cur$cfg  monitoring_config_type;
+  cur$rc   integer;
+begin
+  begin
+    cur$cfg := monitoring_config_type( 'debug_level', 'mview', 'Level for debug messages' );
+
+    cur$cfg.set_value( plog.linfo ); -- Default value
+    cur$rc := cur$cfg.set_parameter( cur$cfg );
+
+    if cur$rc = 0 then
+       raise_application_error(-20001, 'Can''t init configuration parameter mview:debug_level' );
+    end if;
+  exception
+    when OTHERS then
+      raise_application_error(-20001, 'Can''t init configuration parameter mview:debug_level'
+                                      || sqlerrm(sqlcode) );
+  end;
+end;
+/
+*/
+
+prompt
+prompt I: Finish installation
+prompt
